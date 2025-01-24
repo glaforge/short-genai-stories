@@ -1,12 +1,20 @@
 document.addEventListener('DOMContentLoaded', function () {
-        const searchParams = new URLSearchParams(window.location.search);
-
         try {
             let app = firebase.app();
             const db = firebase.firestore(app);
 
-            const query = !!searchParams.get('story') ?
-                db.collection('short-story').where(firebase.firestore.FieldPath.documentId(), '==', searchParams.get('story')) :
+            const searchParams = new URLSearchParams(window.location.search);
+            console.log("StoryID: " + document.location.pathname.split('/').slice(-1)[0]);
+            console.log("Search param: " + searchParams.get("story"));
+
+            const storyId = searchParams.has("story") ?
+                searchParams.get("story") :
+                (document.location.pathname.startsWith('/story/') ?
+                        document.location.pathname.split('/').slice(-1)[0] :
+                        null);
+
+            const query = !!storyId ?
+                db.collection('short-story').where(firebase.firestore.FieldPath.documentId(), '==', storyId) :
                 db.collection('short-story').orderBy('createdAt', 'desc').limit(1);
 
             query.get()
@@ -24,6 +32,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                     .format(publicationDate);
 
                             document.querySelector("#title").innerHTML = title;
+
+                            document.title = title + " — " + document.title;
 
                             const chaptersElem = document.querySelector("#story div.chapters");
 
@@ -71,7 +81,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                             console.log(selector === '#prev' ? "Previous <- " : "Next -> ", storyId);
                                             const anchor = arrow.querySelector("a");
                                             anchor.innerHTML = querySnapshot.docs[0].data().title;
-                                            anchor.href = `?story=${storyId}`;
+                                            anchor.href = `/?story=${storyId}`;
                                             arrow.style.display = "block";
                                         } else {
                                             arrow.style.display = "none"; // Use none instead of hidden for better semantics
