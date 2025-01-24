@@ -123,7 +123,7 @@ details[open] > summary::after {
     margin-top: 0;
     margin-bottom: 1em;
 
-    border: 4var(--border-size) solid var(--border-color);
+    border: var(--border-size) solid var(--border-color);
     border-top: 0;
 }
 

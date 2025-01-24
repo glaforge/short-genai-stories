@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                             anchor.href = `/?story=${storyId}`;
                                             arrow.style.display = "block";
                                         } else {
-                                            arrow.style.display = "none"; // Use none instead of hidden for better semantics
+                                            arrow.style.display = "none";
                                         }
                                     });
                             }
