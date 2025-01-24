@@ -10,8 +10,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const storyId = searchParams.has("story") ?
                 searchParams.get("story") :
                 (document.location.pathname.startsWith('/story/') ?
-                        document.location.pathname.split('/').slice(-1)[0] :
-                        null);
+                    document.location.pathname.split('/').slice(-1)[0] :
+                    null);
 
             const query = !!storyId ?
                 db.collection('short-story').where(firebase.firestore.FieldPath.documentId(), '==', storyId) :
@@ -19,6 +19,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
             query.get()
                 .then((querySnapshot) => {
+                        if (querySnapshot.empty) {
+                            window.location.href = '/';
+                        }
+
                         querySnapshot.forEach((doc) => {
                             const title = doc.data().title;
                             const chapters = doc.data().chapters;
