@@ -1,0 +1,176 @@
+:root {
+    --background-color: #217499;
+    --chapter-background: #185d7c;
+    --box-shadow: #082836;
+    --border-color: black;
+    --border-size: 2px;
+}
+
+* {
+    box-sizing: border-box;
+    border-collapse: collapse;
+}
+
+html {
+    padding: 1em;
+}
+
+body {
+    margin: auto;
+
+    background-color: var(--background-color);
+
+    color: white;
+    font-family: sans-serif;
+    font-size: large;
+    font-weight: bold;
+    text-shadow: black 1px 1px;
+
+    text-align: center;
+}
+
+h1, summary, #back a {
+    font-family: "Bangers", serif;
+}
+
+h1 {
+    margin: 0;
+    padding: 0;
+
+    font-weight: bold;
+    font-size: 3em;
+
+    -webkit-text-stroke: 1px black;
+}
+
+#publicationDate {
+    padding-bottom: 1em;
+}
+
+summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.8em 0.1em 0.4em;
+
+    font-size: 2em;
+
+    -webkit-text-stroke: 1px black;
+
+    cursor: pointer;
+}
+
+/* https://www.sitepoint.com/style-html-details-element/#creatingacustommarkerforthesummaryelement */
+summary::after {
+    content: '';
+    min-width: 36px;
+    height: 20px;
+    background: url('arrow.svg') no-repeat;
+    background-size: cover;
+    transition: 0.2s;
+}
+
+summary::-webkit-details-marker {
+    display: none;
+}
+
+details {
+    border: var(--border-size) solid var(--border-color);
+    border-radius: 1em 1em 0 0;
+    padding: 0 1em 1em 1em;
+
+    text-align: left;
+
+    background-color: var(--chapter-background);
+
+    box-shadow: inset 0.2em 0.2em 1em var(--box-shadow);
+
+    /* https://stackoverflow.com/questions/38213329/how-to-add-css3-transition-with-html5-details-summary-tag-reveal/79142029#79142029 */
+    interpolate-size: allow-keywords;
+
+    &::details-content {
+        transition:
+                block-size 0.5s,
+                content-visibility 0.5s allow-discrete;
+        overflow: hidden;
+        block-size: 0;
+    }
+
+    &[open]::details-content {
+        block-size: auto;
+    }
+}
+
+details[open] > summary::after {
+    transform: rotate(-180deg);
+}
+
+#story {
+    max-width: 40em;
+
+    margin: auto;
+
+    font-size: larger;
+    font-family: "Arimo", serif;
+    font-optical-sizing: auto;
+    font-style: normal;
+}
+
+#story img {
+    width: 100%;
+
+    margin-top: 0;
+    margin-bottom: 1em;
+
+    border: 4var(--border-size) solid var(--border-color);
+    border-top: 0;
+}
+
+#theEnd {
+    margin-top: 0;
+    padding-top: 0;
+}
+
+#nextPrev {
+    max-width: 24em;
+    margin: auto;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+
+    font-family: "Bangers", serif;
+    font-size: 2em;
+
+    -webkit-text-stroke: 1px black;
+}
+
+#next, #prev {
+    display: none;
+    cursor: pointer;
+}
+
+#next a, #prev a {
+    text-decoration: none;
+    color: white;
+    -webkit-text-stroke: 1px black;
+}
+
+#prev {
+    text-align: left;
+}
+
+#next {
+    text-align: right;
+}
+
+#verticalSeparator {
+    width: 1em;
+}
+
+#back a:link, #back a:visited, #back a:hover, #back a:active {
+    font-size: larger;
+    text-decoration: none;
+    color: white;
+    -webkit-text-stroke: 1px black;
+}
