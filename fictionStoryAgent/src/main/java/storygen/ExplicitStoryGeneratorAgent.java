@@ -1,19 +1,19 @@
 package storygen;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.FirestoreOptions;
 import com.google.cloud.firestore.WriteResult;
 import com.google.cloud.vertexai.api.Schema;
 import com.google.cloud.vertexai.api.Type;
 import com.google.gson.Gson;
-import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.image.Image;
-import dev.langchain4j.data.message.*;
-import dev.langchain4j.model.chat.listener.ChatModelErrorContext;
-import dev.langchain4j.model.chat.listener.ChatModelListener;
-import dev.langchain4j.model.chat.listener.ChatModelRequestContext;
-import dev.langchain4j.model.chat.listener.ChatModelResponseContext;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.ImageContent;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.output.Response;
 import dev.langchain4j.model.output.structured.Description;
 import dev.langchain4j.model.vertexai.VertexAiGeminiChatModel;
@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 
 public class ExplicitStoryGeneratorAgent {
 
@@ -37,33 +36,6 @@ public class ExplicitStoryGeneratorAgent {
     private static final Random RANDOM = new Random();
 
     private static final Gson GSON = new Gson();
-
-    private static final List<ChatModelListener> CHAT_MODEL_LISTENERS = List.of(new ChatModelListener() {
-        @Override
-        public void onError(ChatModelErrorContext errorContext) {
-            System.out.println("[ON ERROR] " + red(errorContext.error().getMessage()));
-        }
-
-        @Override
-        public void onRequest(ChatModelRequestContext requestContext) {
-            System.out.println("[ON REQUEST] \n" + cyan(requestContext.request().messages().stream()
-                .map(chatMessage -> " --> " + chatMessage.toString())
-                .collect(Collectors.joining("\n"))));
-        }
-
-        @Override
-        public void onResponse(ChatModelResponseContext responseContext) {
-            System.out.println("[ON RESPONSE] ");
-            if (responseContext.response().aiMessage().text() != null) {
-                System.out.println("  TEXT = " + yellow(responseContext.response().aiMessage().text()));
-            }
-            if (responseContext.response().aiMessage().hasToolExecutionRequests()) {
-                for (ToolExecutionRequest toolExecutionRequest : responseContext.response().aiMessage().toolExecutionRequests()) {
-                    System.out.println("  TOOL = " + yellow(toolExecutionRequest.toString()));
-                }
-            }
-        }
-    });
 
     record Story(
         @Description("The title of the story")
@@ -86,7 +58,7 @@ public class ExplicitStoryGeneratorAgent {
 
         Story story = prepareStory("a science-fiction novel");
 
-        System.out.println(red(story.title) + "\n");
+        System.out.println(blue(story.title) + "\n");
         story.chapters().forEach(chapter -> {
             System.out.println(green(chapter.chapterTitle) + "\n");
             System.out.println(chapter.chapterContent + "\n");
@@ -96,16 +68,21 @@ public class ExplicitStoryGeneratorAgent {
             System.out.println("Generating images for: " + green(chapter.chapterTitle) + "\n");
 
             String imagePrompt = prepareImagePromptForChapter(chapter);
+            System.out.println("Image prompt: " + yellow(imagePrompt));
+
             List<String> imagesForChapter = generateImages(imagePrompt);
+            imagesForChapter.forEach(imageUrl -> System.out.println(green(" - " + imageUrl)));
 
             String bestImage = pickBestImageForChapter(chapter.chapterContent, imagesForChapter);
+            System.out.println("Best image: " + yellow(bestImage));
 
             return new Story.Chapter(chapter.chapterTitle, chapter.chapterContent, bestImage);
         }).toList();
 
         Story newStoryWithImages = new Story(story.title, newChaptersWithImages);
 
-        saveToFirestore(newStoryWithImages);
+        Timestamp timestamp = saveToFirestore(newStoryWithImages);
+        System.out.println("Saved in Firestore at: " + timestamp);
     }
 
     private static String pickBestImageForChapter(String chapterContent, List<String> imagesForChapter) {
@@ -118,7 +95,6 @@ public class ExplicitStoryGeneratorAgent {
             .project(System.getenv("GCP_PROJECT_ID"))
             .location(System.getenv("GCP_LOCATION"))
             .modelName(CHAT_MODEL_NAME)
-//            .listeners(CHAT_MODEL_LISTENERS)
             .responseSchema(Schema.newBuilder()
                 .setType(Type.OBJECT)
                 .putProperties("bestImage", Schema.newBuilder()
@@ -151,15 +127,10 @@ public class ExplicitStoryGeneratorAgent {
         Response<AiMessage> response = chatModel.generate(judgementPromptMessages);
         BestImage bestImage = GSON.fromJson(response.content().text(), BestImage.class);
 
-        System.out.println("Best image: " + yellow(bestImage.bestImage));
-
         return bestImage.bestImage;
     }
 
     private static List<String> generateImages(String imagePrompt) {
-
-        System.out.println("Image prompt: " + yellow(imagePrompt));
-
         VertexAiImageModel imageModel = VertexAiImageModel.builder()
             .project(System.getenv("GCP_PROJECT_ID"))
             .location(System.getenv("GCP_LOCATION"))
@@ -174,7 +145,6 @@ public class ExplicitStoryGeneratorAgent {
 
         return imageResponse.content().stream()
             .map(image -> image.url().toString())
-            .peek(imageUrl -> System.out.println(green(" - " + imageUrl)))
             .toList();
     }
 
@@ -190,7 +160,6 @@ public class ExplicitStoryGeneratorAgent {
             .location(System.getenv("GCP_LOCATION"))
             .modelName(CHAT_MODEL_NAME)
             .temperature(1.5f)
-//            .listeners(CHAT_MODEL_LISTENERS)
             .responseSchema(Schema.newBuilder()
                 .setType(Type.OBJECT)
                 .putProperties("imagePrompt", Schema.newBuilder()
@@ -227,7 +196,6 @@ public class ExplicitStoryGeneratorAgent {
             .location(System.getenv("GCP_LOCATION"))
             .modelName(CHAT_MODEL_NAME)
             .temperature(1.5f)
-//            .listeners(CHAT_MODEL_LISTENERS)
             .responseSchema(Schema.newBuilder()
                 .setType(Type.OBJECT)
                 .putProperties("title", Schema.newBuilder()
@@ -272,7 +240,7 @@ public class ExplicitStoryGeneratorAgent {
         return generatedStory;
     }
 
-    private static void saveToFirestore(Story story) throws IOException, InterruptedException, ExecutionException {
+    private static Timestamp saveToFirestore(Story story) throws IOException, InterruptedException, ExecutionException {
         FirestoreOptions firestoreOptions =
             FirestoreOptions.getDefaultInstance().toBuilder()
                 .setProjectId(System.getenv("GCP_PROJECT_ID"))
@@ -302,7 +270,7 @@ public class ExplicitStoryGeneratorAgent {
                     )).toList()
             )).get();
 
-        System.out.println("Saved in Firestore at: " + writeResult.getUpdateTime());
+        return writeResult.getUpdateTime();
     }
 
 
