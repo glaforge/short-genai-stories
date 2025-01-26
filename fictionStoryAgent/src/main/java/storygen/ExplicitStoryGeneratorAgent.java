@@ -29,9 +29,14 @@ import java.util.concurrent.ExecutionException;
 
 public class ExplicitStoryGeneratorAgent {
 
-    private static final String CHAT_MODEL_NAME = "gemini-2.0-flash-exp";
-//    private static final String CHAT_MODEL_NAME = "gemini-1.5-pro-002";
+//    private static final String CHAT_MODEL_NAME = "gemini-2.0-flash-exp";
+//    private static final String CHAT_MODEL_NAME = "gemini-1.5-flash-002";
+    private static final String CHAT_MODEL_NAME = "gemini-1.5-pro-002";
     private static final String IMAGE_MODEL_NAME = "imagen-3.0-generate-001";
+
+    public static final String GCP_PROJECT_ID = System.getenv("GCP_PROJECT_ID");
+    public static final String GCP_LOCATION = System.getenv("GCP_LOCATION");
+    public static final String GCP_VERTEXAI_ENDPOINT = System.getenv("GCP_VERTEXAI_ENDPOINT");
 
     private static final Random RANDOM = new Random();
 
@@ -85,6 +90,116 @@ public class ExplicitStoryGeneratorAgent {
         System.out.println("Saved in Firestore at: " + timestamp);
     }
 
+    private static Story prepareStory(String storyType) {
+        var chatModel = VertexAiGeminiChatModel.builder()
+            .project(GCP_PROJECT_ID)
+            .location(GCP_LOCATION)
+            .modelName(CHAT_MODEL_NAME)
+            .temperature(1.5f)
+            .responseSchema(Schema.newBuilder()
+                .setType(Type.OBJECT)
+                .putProperties("title", Schema.newBuilder()
+                    .setDescription("The title of the story")
+                    .setType(Type.STRING)
+                    .build())
+                .putProperties("chapters", Schema.newBuilder()
+                    .setDescription("The list of 5 chapters")
+                    .setType(Type.ARRAY)
+                    .setItems(Schema.newBuilder()
+                        .setDescription("A chapter with a title, and its content")
+                        .setType(Type.OBJECT)
+                        .putProperties("chapterTitle", Schema.newBuilder()
+                            .setType(Type.STRING)
+                            .setDescription("The title of the chapter")
+                            .build())
+                        .putProperties("chapterContent", Schema.newBuilder()
+                            .setType(Type.STRING)
+                            .setDescription("The content of the chapter, made of 20 sentences")
+                            .build())
+                        .addAllRequired(List.of("chapterTitle", "chapterContent"))
+                        .build())
+                    .build())
+                .addAllRequired(List.of("title", "chapters"))
+                .build())
+            .build();
+
+        Response<AiMessage> response = chatModel.generate(
+            SystemMessage.from("""
+                You are a creative fiction author, and your role is to write stories.
+                You write a story as requested by the user.
+
+                A story always has a title, and is made of 5 long chapters.
+                Each chapter has a title, is split into paragraphs, \
+                and is at least 20 sentences long.
+                """),
+            UserMessage.from(storyType)
+        );
+
+        String responseText = response.content().text();
+        Story generatedStory = GSON.fromJson(responseText, Story.class);
+        return generatedStory;
+    }
+
+    private static String prepareImagePromptForChapter(Story.Chapter chapter) {
+        record ImagePrompt(
+            String imagePrompt
+        ) {}
+
+        Response<AiMessage> imagePromptResponse = null;
+
+        try (var chatModel = VertexAiGeminiChatModel.builder()
+            .project(GCP_PROJECT_ID)
+            .location(GCP_LOCATION)
+            .modelName(CHAT_MODEL_NAME)
+            .temperature(1.5f)
+            .responseSchema(Schema.newBuilder()
+                .setType(Type.OBJECT)
+                .putProperties("imagePrompt", Schema.newBuilder()
+                    .setDescription("An image generation prompt for this chapter")
+                    .setType(Type.STRING)
+                    .build())
+                .addAllRequired(List.of("imagePrompt"))
+                .build())
+            .build()) {
+
+            imagePromptResponse = chatModel.generate(
+                SystemMessage.from("""
+                    You are an expert artist who masters crafting great prompts for image generation models, to illustrate short stories.
+                    When given a short story, reply with a concise prompt that could be used to create an illustration with the Imagen 3 model.
+                    Don't use any flags like those used with MidJourney. Just answer with the short concise text prompt.
+                    
+                    Your answer MUST start with "A cartoon of ", as we want to use cartoon or comics illustrations.
+                    
+                    The user gives you the following image prompt for the chapter to illustrate:
+                    """),
+                UserMessage.from(chapter.chapterContent)
+            );
+        } catch (IOException e) {
+            System.err.println("Exception: " + e.getMessage());
+        }
+
+        ImagePrompt imagePrompt = GSON.fromJson(imagePromptResponse.content().text(), ImagePrompt.class);
+        return imagePrompt.imagePrompt;
+    }
+
+    private static List<String> generateImages(String imagePrompt) {
+        VertexAiImageModel imageModel = VertexAiImageModel.builder()
+            .project(GCP_PROJECT_ID)
+            .location(GCP_LOCATION)
+            .endpoint(GCP_VERTEXAI_ENDPOINT)
+            .modelName(IMAGE_MODEL_NAME)
+            .publisher("google")
+            .withPersisting()
+            .persistToCloudStorage("gs://genai-java-demos.firebasestorage.app")
+            .build();
+
+        Response<List<Image>> imageResponse = imageModel.generate(imagePrompt, 4);
+
+        return imageResponse.content().stream()
+            .map(image -> image.url().toString())
+            .toList();
+    }
+
     private static String pickBestImageForChapter(String chapterContent, List<String> imagesForChapter) {
 
         record BestImage(
@@ -92,8 +207,8 @@ public class ExplicitStoryGeneratorAgent {
         ) {}
 
         var chatModel = VertexAiGeminiChatModel.builder()
-            .project(System.getenv("GCP_PROJECT_ID"))
-            .location(System.getenv("GCP_LOCATION"))
+            .project(GCP_PROJECT_ID)
+            .location(GCP_LOCATION)
             .modelName(CHAT_MODEL_NAME)
             .responseSchema(Schema.newBuilder()
                 .setType(Type.OBJECT)
@@ -130,120 +245,10 @@ public class ExplicitStoryGeneratorAgent {
         return bestImage.bestImage;
     }
 
-    private static List<String> generateImages(String imagePrompt) {
-        VertexAiImageModel imageModel = VertexAiImageModel.builder()
-            .project(System.getenv("GCP_PROJECT_ID"))
-            .location(System.getenv("GCP_LOCATION"))
-            .endpoint(System.getenv("GCP_VERTEXAI_ENDPOINT"))
-            .modelName(IMAGE_MODEL_NAME)
-            .publisher("google")
-            .withPersisting()
-            .persistToCloudStorage("gs://genai-java-demos.firebasestorage.app")
-            .build();
-
-        Response<List<Image>> imageResponse = imageModel.generate(imagePrompt, 4);
-
-        return imageResponse.content().stream()
-            .map(image -> image.url().toString())
-            .toList();
-    }
-
-    private static String prepareImagePromptForChapter(Story.Chapter chapter) {
-        record ImagePrompt(
-            String imagePrompt
-        ) {}
-
-        Response<AiMessage> imagePromptResponse = null;
-
-        try (var chatModel = VertexAiGeminiChatModel.builder()
-            .project(System.getenv("GCP_PROJECT_ID"))
-            .location(System.getenv("GCP_LOCATION"))
-            .modelName(CHAT_MODEL_NAME)
-            .temperature(1.5f)
-            .responseSchema(Schema.newBuilder()
-                .setType(Type.OBJECT)
-                .putProperties("imagePrompt", Schema.newBuilder()
-                    .setDescription("An image generation prompt for this chapter")
-                    .setType(Type.STRING)
-                    .build())
-                .addAllRequired(List.of("imagePrompt"))
-                .build())
-            .build()) {
-
-            imagePromptResponse = chatModel.generate(
-                SystemMessage.from("""
-                    You are an expert artist who masters crafting great prompts for image generation models, to illustrate short stories.
-                    When given a short story, reply with a concise prompt that could be used to create an illustration with the Imagen 3 model.
-                    Don't use any flags like those used with MidJourney. Just answer with the short concise text prompt.
-                    
-                    Your answer MUST start with "A cartoon of ", as we want to use cartoon or comics illustrations.
-                    
-                    The user gives you the following image prompt for the chapter to illustrate:
-                    """),
-                UserMessage.from(chapter.chapterContent)
-            );
-        } catch (IOException e) {
-            System.err.println("Exception: " + e.getMessage());
-        }
-
-        ImagePrompt imagePrompt = GSON.fromJson(imagePromptResponse.content().text(), ImagePrompt.class);
-        return imagePrompt.imagePrompt;
-    }
-
-    private static Story prepareStory(String storyType) {
-        var chatModel = VertexAiGeminiChatModel.builder()
-            .project(System.getenv("GCP_PROJECT_ID"))
-            .location(System.getenv("GCP_LOCATION"))
-            .modelName(CHAT_MODEL_NAME)
-            .temperature(1.5f)
-            .responseSchema(Schema.newBuilder()
-                .setType(Type.OBJECT)
-                .putProperties("title", Schema.newBuilder()
-                    .setDescription("The title of the story")
-                    .setType(Type.STRING)
-                    .build())
-                .putProperties("chapters", Schema.newBuilder()
-                    .setDescription("The list of 5 chapters")
-                    .setType(Type.ARRAY)
-                    .setItems(Schema.newBuilder()
-                        .setDescription("A chapter with a title, and its content")
-                        .setType(Type.OBJECT)
-                        .putProperties("chapterTitle", Schema.newBuilder()
-                            .setType(Type.STRING)
-                            .setDescription("The title of the chapter")
-                            .build())
-                        .putProperties("chapterContent", Schema.newBuilder()
-                            .setType(Type.STRING)
-                            .setDescription("The content of the chapter, made of 20 sentences")
-                            .build())
-                        .addAllRequired(List.of("chapterTitle", "chapterContent"))
-                        .build())
-                    .build())
-                .addAllRequired(List.of("title", "chapters"))
-                .build())
-            .build();
-
-        Response<AiMessage> response = chatModel.generate(
-            SystemMessage.from("""
-                You are a creative fiction author, and your role is to write stories.
-                You write a story as requested by the user.
-
-                A story always has a title, and is made of 5 long chapters.
-                Each chapter has a title, and is at least 20 sentences long.
-                Split the chapter into paragraphs, to improve legibility.
-                """),
-            UserMessage.from(storyType)
-        );
-
-        String responseText = response.content().text();
-        Story generatedStory = GSON.fromJson(responseText, Story.class);
-        return generatedStory;
-    }
-
     private static Timestamp saveToFirestore(Story story) throws IOException, InterruptedException, ExecutionException {
         FirestoreOptions firestoreOptions =
             FirestoreOptions.getDefaultInstance().toBuilder()
-                .setProjectId(System.getenv("GCP_PROJECT_ID"))
+                .setProjectId(GCP_PROJECT_ID)
                 .setCredentials(GoogleCredentials.getApplicationDefault())
                 .build();
 
