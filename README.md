@@ -1,9 +1,16 @@
-# Short GenAI Stories
+# 🧠 Short GenAI Stories 📕
+
+Every day, at midnight (UTC), a new short story is generated!
+You can read the stories online: 
+
+https://short-ai-story.web.app/
 
 This project is developed in Java, and uses the [LangChain4j](https://docs.langchain4j.dev/) open source LLM orchestration framework.
 
 Stories are generated thanks to [Gemini](https://cloud.google.com/vertex-ai/generative-ai/docs/overview), 
 and [Imagen 3](https://cloud.google.com/vertex-ai/generative-ai/docs/image/overview).
+
+![Example story illustration](example-story.png)
 
 ## Setup and Usage
 
