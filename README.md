@@ -12,6 +12,19 @@ and [Imagen 3](https://cloud.google.com/vertex-ai/generative-ai/docs/image/overv
 
 ![Example story illustration](example-story.png)
 
+## The agent workflow
+
+![Agent workflow diagram](agent-workflow.png)
+
+The [ExplicitStoryGeneratorAgent](fictionStoryAgent/src/main/java/storygen/ExplicitStoryGeneratorAgent.java) class 
+is an _explicit workflow agent_, in the sense that the code is driving the planning and execution of the story generation.
+
+The agent:
+- calls Gemini to create a story, with a title, with 5 chapters with a title and content for each
+- for each of the chapters' content, asks Gemini to create a specific image generation prompt
+- invokes Imagen with the prompt to generate a few images (4 by default) for each chapter's content
+- a self-reflection step requests Gemini to judge the resulting images of each chapter to know which image matches the story line best. 
+
 ## Setup and Usage
 
 1. **Prerequisites:**
