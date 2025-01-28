@@ -88,23 +88,37 @@ document.addEventListener('DOMContentLoaded', function () {
 
                             // other stories
 
-                            function getAdjacentStory(db, createdAt, comparator, order, selector) {
+                            function getAdjacentStory(db, createdAt, selector) {
+                                const order = selector === 'prev' ? 'desc' : 'asc';
+                                const comparator = selector === 'prev' ? '<' : '>';
+
                                 return db.collection('short-story')
                                     .where('createdAt', comparator, createdAt)
                                     .orderBy('createdAt', order)
                                     .limit(1)
                                     .get()
                                     .then((querySnapshot) => {
-                                        const arrow = document.querySelector(selector);
+                                        const upArrow = document.querySelector('#navigation div.' + selector);
+                                        const bottomArrow = document.querySelector('#nextPrev div.' + selector);
                                         if (querySnapshot.docs.length > 0) {
                                             const storyId = querySnapshot.docs[0].id;
-                                            console.log(selector === '#prev' ? "Previous <- " : "Next -> ", storyId);
-                                            const anchor = arrow.querySelector("a");
-                                            anchor.innerHTML = querySnapshot.docs[0].data().title;
-                                            anchor.href = `/?story=${storyId}`;
-                                            arrow.style.display = "block";
+
+                                            const anchorTop = upArrow.querySelector("a");
+                                            anchorTop.href = `/?story=${storyId}`;
+
+                                            const anchorBottom = bottomArrow.querySelector("a");
+                                            if (selector === 'prev') {
+                                                anchorBottom.innerHTML = '⇦ ' + querySnapshot.docs[0].data().title;
+                                            } else {
+                                                anchorBottom.innerHTML = querySnapshot.docs[0].data().title + ' ⇨';
+                                            }
+                                            anchorBottom.href = `/?story=${storyId}`;
+
+                                            upArrow.style.visibility = "visible";
+                                            bottomArrow.parentElement.style.visibility = "visible";
                                         } else {
-                                            arrow.style.display = "none";
+                                            upArrow.style.visibility = "hidden";
+                                            bottomArrow.parentElement.style.display = "hidden";
                                         }
                                     });
                             }
@@ -114,8 +128,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                     querySnapshot.forEach((doc) => {
                                         const createdAt = doc.data().createdAt;
 
-                                        getAdjacentStory(db, createdAt, '<', 'desc', '#prev');
-                                        getAdjacentStory(db, createdAt, '>', 'asc', '#next');
+                                        getAdjacentStory(db, createdAt, 'prev');
+                                        getAdjacentStory(db, createdAt, 'next');
                                     });
                                 })
                         });
