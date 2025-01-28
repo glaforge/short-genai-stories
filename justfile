@@ -32,18 +32,23 @@ package:
     mvn package
 
 [working-directory: 'fictionStoryAgent']
-build:
+build: package
     gcloud builds submit \
       --region=$GCP_LOCATION \
       --tag $GCP_LOCATION-docker.pkg.dev/$GCP_PROJECT_ID/{{repoName}}/{{imgName}}:latest
 
-create-job:
+create-job: build
     gcloud run jobs create {{jobName}} \
       --image $GCP_LOCATION-docker.pkg.dev/$GCP_PROJECT_ID/{{repoName}}/{{imgName}}:latest \
       --region $GCP_LOCATION \
       --set-env-vars "GCP_PROJECT_ID=$GCP_PROJECT_ID" \
       --set-env-vars "GCP_LOCATION=$GCP_LOCATION" \
       --set-env-vars "GCP_VERTEXAI_ENDPOINT=$GCP_LOCATION-aiplatform.googleapis.com:443"
+
+update-job: build
+    gcloud run jobs update {{jobName}} \
+      --region $GCP_LOCATION \
+      --image $GCP_LOCATION-docker.pkg.dev/$GCP_PROJECT_ID/{{repoName}}/{{imgName}}:latest
 
 create-scheduler:
     gcloud scheduler jobs create http short-genai-stories-generator-schedule \

@@ -3,12 +3,15 @@
 Every day, at midnight (UTC), a new short story is generated!
 You can read the stories online: 
 
-https://short-ai-story.web.app/
+➡️ https://short-ai-story.web.app/
 
 This project is developed in Java, and uses the [LangChain4j](https://docs.langchain4j.dev/) open source LLM orchestration framework.
-
 Stories are generated thanks to [Gemini](https://cloud.google.com/vertex-ai/generative-ai/docs/overview), 
 and [Imagen 3](https://cloud.google.com/vertex-ai/generative-ai/docs/image/overview).
+
+You can read more about the inception of this project in this article: 
+
+➡️ [An AI agent to generate short sci-fi stories](https://glaforge.dev/posts/2025/01/27/an-ai-agent-to-generate-short-scifi-stories/).
 
 ![Example story illustration](example-story.png)
 

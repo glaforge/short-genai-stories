@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Supplier;
 
 public class ExplicitStoryGeneratorAgent {
 
@@ -49,13 +50,189 @@ public class ExplicitStoryGeneratorAgent {
     private static final String CHAT_MODEL_NAME = "gemini-1.5-pro-002";
     private static final String IMAGE_MODEL_NAME = "imagen-3.0-generate-001";
 
-    public static final String GCP_PROJECT_ID = System.getenv("GCP_PROJECT_ID");
-    public static final String GCP_LOCATION = System.getenv("GCP_LOCATION");
-    public static final String GCP_VERTEXAI_ENDPOINT = System.getenv("GCP_VERTEXAI_ENDPOINT");
+    private static final String GCP_PROJECT_ID = System.getenv("GCP_PROJECT_ID");
+    private static final String GCP_LOCATION = System.getenv("GCP_LOCATION");
+    private static final String GCP_VERTEXAI_ENDPOINT = System.getenv("GCP_VERTEXAI_ENDPOINT");
+
+    private static final Supplier<VertexAiGeminiChatModel.VertexAiGeminiChatModelBuilder> CHAT_MODEL_BUILDER = () ->
+        VertexAiGeminiChatModel.builder()
+            .project(GCP_PROJECT_ID)
+            .location(GCP_LOCATION)
+            .modelName(CHAT_MODEL_NAME);
 
     private static final Random RANDOM = new Random();
 
     private static final Gson GSON = new Gson();
+
+    /**
+     * Different types and arcs of science-fiction.
+     * Labels coming form:
+     * https://www.rachelagreco.com/30-types-of-science-fiction-every-sci-fi-lover-should-know/
+     */
+    enum StoryType {
+        ALIEN_INVASION("""
+            Alien Invasion: An often technologically-superior extraterrestrial society \
+            invades Earth with an evil intent, whether to enslave humans, eat them, or \
+            use the planet for some other destructive purpose."""),
+        ALTERNATE_HISTORY("""
+            Alternate History: This sub-genre asks the question: What if history had \
+            occurred differently? This type of fiction consists of a change that causes \
+            history to diverge from the history we know.
+            """),
+        ALTERNATE_OR_PARALLEL_UNIVERSE("""
+            Alternate/Parallel Universe: This type of fiction has a self-contained \
+            separate reality coexisting with our own and can vary from a small \
+            geographic region to an entire universe.
+            """),
+        APOCALYPTIC_AND_POSTAPOCALYPTIC("""
+            Apocalyptic/Post-Apocalyptic: Apocalyptic stories are set in a world that \
+            touches on the end of civilization, through nuclear war, plague, or some \
+            other disaster. Post-Apocalyptic is set in a place where such a disaster \
+            has already occurred, where the survivors have to deal with the aftermath, \
+            whether days after the disaster or years.
+            """),
+        ARTIFICIAL_INTELLIGENCE("""
+            Artificial Intelligence: Any story that has Artificial Intelligence (AI) as \
+            the main theme. AI is a branch of computer science that consists of \
+            intelligent behavior, learning and adaptation in machines.
+            """),
+        COLONIZATION("""
+            Colonization: Life forms (usually humans or insects) move into a distant \
+            area where their kind is sparse or not yet existing and set up new \
+            settlements in the area.
+            """),
+        CYBERPUNK("""
+            Cyberpunk: This name comes from cybernetics (replacing parts of your body \
+            with machinery, like a cyborg) and punk. It features advanced \
+            technology–computers or information technology–coupled with some degree of \
+            breakdown in the social order. The main characters are often marginalized, \
+            alienated loners who live on the edge of society.
+            """),
+        DYING_EARTH("""
+            Dying Earth: This sub-genre is similar to apocalyptic/post-apocalyptic in \
+            that the end of the world is coming. But unlike those, the end of the world \
+            is just due to the natural laws of the universe, in which the sun is fading \
+            and the earth’s dying (poor thing!).
+            """),
+        DYSTOPIA("""
+            Dystopia: Some people argue that this is a genre all on its own under the \
+            Speculative Fiction umbrella. Regardless, many sci-fi books fall into this \
+            category, where the world is opposite of a utopia: more of a nightmare. \
+            Oftentimes, the world is shown to be good/perfect/utopian, but the reader \
+            soon finds out it isn’t.
+            """),
+        FIRST_CONTACT("""
+            First Contact: Features the first meeting between humans and aliens (or any \
+            two sentient races). Unlike Alien Invasion, the aliens in this subgenre \
+            aren’t necessarily hostile.
+            """),
+        GALACTIC_EMPIRE("""
+            Galactic Empire: Any books with a Galactic Empire like that in Star Wars.
+            """),
+        GENERATION_SHIP("""
+            Generation Ship: A subgenre in which characters travel on a type of \
+            starship called a generation ship much slower than light between stars. \
+            Because they’re traveling so slow and it could take thousands of years to \
+            reach their destination, the original occupants would die during the \
+            journey, leaving their descendants to continue traveling
+            """),
+        HUMAN_DEVELOPMENT("""
+            Human Development: Books in which science or nature has given humans \
+            enhanced mental or physical abilities.
+            """),
+        IMMORTALITY("""
+            Immortality: Stories that explore what form an unending or \
+            indefinitely-long human life would take, or whether it’s even possible.
+            """),
+        LIGHT_AND_HUMOROUS("""
+            Light/Humorous SF: Another broader subgenre that encompasses \
+            any sci-fi books containing humorous sci-fi.
+            """),
+        MILITARY("""
+            Military: War, as the solution to either interstellar or interplanetary \
+            conflict, makes up the main or partial plot of these stories. The main \
+            characters are often part of the military.
+            """),
+        MUNDANE("""
+            Mundane: Characters remain on earth in this subgenre, and there’s a \
+            believability of the use of science and technology at the time the \
+            book’s written.
+            """),
+        MUTANTS("""
+            Mutants: Characters who exhibit powers often like superheroes. Unlike \
+            the human development subgenre, these powers come about more naturally, \
+            as opposed to via experiments. Think zombies more than Teenage Mutant \
+            Ninja Turtles.
+            """),
+        NANOTECHNOLOGIY("""
+            Nanotechnology: Books that focus on this kind of science, which is \
+            about designing and producing devices and/or systems on the nanoscale
+            """),
+        NEAR_FUTURE("""
+            Near-Future: These stories take place in the present day or in the \
+            next few decades, and the setting should be somewhat familiar to the \
+            reader. The technology is often current or in development.
+            """),
+        ROBOTS_AND_ANDROIDS("""
+            Robots and/or Androids: Stories that have robots and/or androids.
+            """),
+        SCIENCE_FANTASY("""
+            Science-Fantasy: This subgenre represents works that use main \
+            elements of both genres to create a story that is futuristic and \
+            technical with fantastical subplots and characters. Or a book that \
+            contains, according to Arthur C. Clarke, “any sufficiently advanced \
+            technology [that] is indistinguishable from magic.”
+            """),
+        SPACE_EXPLORATION("""
+            Space Exploration: Any story that touches upon the act of \
+            exploring space, including all the politics, science, and \
+            engineering behind space flight.
+            """),
+        SPACE_OPERA("""
+            Space Opera: Space operas are usually set in outer space or on a \
+            far-flung planet. These are adventurous books that emphasize space \
+            warfare, drama, interplanetary battles, chivalric romance, and \
+            large stakes. It’s often soft science, but not necessarily.
+            """),
+        STREAMPUNK("""
+            Steampunk: Very similar to the subgenre in fantasy, where the focus \
+            is on steam-powered technology. However, unlike in the fantasy \
+            subgenre, the focus is more on the science and how the technology works.
+            """),
+        TERRAFORMING("""
+            Terraforming: A story about modifying a planet or moon so it’s more habitable.
+            """),
+        TIME_TRAVEL("""
+            Time Travel: Moving between different times or universes.
+            """),
+        UPLIFT("""
+            Uplift: When an advanced civilization helps the development of \
+            another one, by giving a non-sentient species sentience, \
+            spacefaring capabilities, or some other help.
+            """),
+        UTOPIA("""
+            Utopia: Unlike dystopia, in which the world is supposed to be \
+            perfect but has gone awry, in utopia books the world is still perfect.
+            """),
+        VIRTUAL_REALITY("""
+            Virtual Reality: Books in which virtual reality (a technology which \
+            allows a person to interact with a computer-simulated environment) \
+            plays an integral part of the plot and/or setting.
+            """);
+
+        private String explanation;
+
+        StoryType(String explanation) {
+            this.explanation = explanation;
+        }
+
+        private static final StoryType[] STORY_TYPES = values();
+        private static final int SIZE = STORY_TYPES.length;
+
+        public static StoryType randomStoryType()  {
+            return STORY_TYPES[RANDOM.nextInt(SIZE)];
+        }
+    }
 
     record Story(
         @Description("The title of the story")
@@ -76,7 +253,9 @@ public class ExplicitStoryGeneratorAgent {
         System.setProperty("org.slf4j.simpleLogger.logFile", "System.out");
         System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "info");
 
-        Story story = prepareStory("a science-fiction novel");
+        StoryType storyType = StoryType.randomStoryType();
+        System.out.println("Story type: " + yellow(storyType.name()));
+        Story story = prepareStory(storyType.explanation);
 
         System.out.println(blue(story.title) + "\n");
         story.chapters().forEach(chapter -> {
@@ -96,7 +275,10 @@ public class ExplicitStoryGeneratorAgent {
             String bestImage = pickBestImageForChapter(chapter.chapterContent, imagesForChapter);
             System.out.println("Best image: " + yellow(bestImage));
 
-            return new Story.Chapter(chapter.chapterTitle, chapter.chapterContent, bestImage);
+            String moreLegibleChapter = improveChapterLegibility(chapter.chapterContent);
+            System.out.println("Update chapter's content: " + green(chapter.chapterTitle) + "\n\n" + moreLegibleChapter);
+
+            return new Story.Chapter(chapter.chapterTitle, moreLegibleChapter, bestImage);
         }).toList();
 
         Story newStoryWithImages = new Story(story.title, newChaptersWithImages);
@@ -106,10 +288,7 @@ public class ExplicitStoryGeneratorAgent {
     }
 
     private static Story prepareStory(String storyType) {
-        var chatModel = VertexAiGeminiChatModel.builder()
-            .project(GCP_PROJECT_ID)
-            .location(GCP_LOCATION)
-            .modelName(CHAT_MODEL_NAME)
+        var chatModel = CHAT_MODEL_BUILDER.get()
             .temperature(1.5f)
             .responseSchema(Schema.newBuilder()
                 .setType(Type.OBJECT)
@@ -162,10 +341,7 @@ public class ExplicitStoryGeneratorAgent {
 
         Response<AiMessage> imagePromptResponse = null;
 
-        try (var chatModel = VertexAiGeminiChatModel.builder()
-            .project(GCP_PROJECT_ID)
-            .location(GCP_LOCATION)
-            .modelName(CHAT_MODEL_NAME)
+        try (var chatModel = CHAT_MODEL_BUILDER.get()
             .temperature(1.5f)
             .responseSchema(Schema.newBuilder()
                 .setType(Type.OBJECT)
@@ -208,7 +384,13 @@ public class ExplicitStoryGeneratorAgent {
             .persistToCloudStorage("gs://genai-java-demos.firebasestorage.app")
             .build();
 
-        Response<List<Image>> imageResponse = imageModel.generate(imagePrompt, 4);
+        Response<List<Image>> imageResponse = null;
+        try {
+            imageResponse = imageModel.generate(imagePrompt, 4);
+        } catch (Exception e) {
+            System.out.println(red(e.getMessage()) + ", regenerating images...");
+            imageResponse = imageModel.generate(imagePrompt + "\nDon't generate images with children, only adults.", 4);
+        }
 
         return imageResponse.content().stream()
             .map(image -> image.url().toString())
@@ -216,15 +398,11 @@ public class ExplicitStoryGeneratorAgent {
     }
 
     private static String pickBestImageForChapter(String chapterContent, List<String> imagesForChapter) {
-
         record BestImage(
             String bestImage
         ) {}
 
-        var chatModel = VertexAiGeminiChatModel.builder()
-            .project(GCP_PROJECT_ID)
-            .location(GCP_LOCATION)
-            .modelName(CHAT_MODEL_NAME)
+        var chatModel = CHAT_MODEL_BUILDER.get()
             .responseSchema(Schema.newBuilder()
                 .setType(Type.OBJECT)
                 .putProperties("bestImage", Schema.newBuilder()
@@ -258,6 +436,16 @@ public class ExplicitStoryGeneratorAgent {
         BestImage bestImage = GSON.fromJson(response.content().text(), BestImage.class);
 
         return bestImage.bestImage;
+    }
+
+    private static String improveChapterLegibility(String chapterContent) {
+        var chatModel = CHAT_MODEL_BUILDER.get()
+            .temperature(0.5f)
+            .build();
+
+        return chatModel.generate(
+            "Split the following text into different paragraphs, to improve legibility:\n\n" +
+                chapterContent);
     }
 
     private static Timestamp saveToFirestore(Story story) throws IOException, InterruptedException, ExecutionException {

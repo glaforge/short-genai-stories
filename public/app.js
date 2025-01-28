@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 details.append(summary);
 
                                 const chapterContent = document.createElement("div");
-                                chapterContent.append(document.createTextNode(chapter.chapterContent));
+                                chapterContent.innerHTML = chapter.chapterContent.replaceAll('\n\n', '<br><br>');
                                 details.append(chapterContent)
                                 oneChapterDiv.append(details);
 
