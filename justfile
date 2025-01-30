@@ -28,8 +28,12 @@ deploy:
     firebase deploy
 
 [working-directory: 'fictionStoryAgent']
+generate:
+    mvn compile exec:java
+
+[working-directory: 'fictionStoryAgent']
 package:
-    mvn package
+    mvn clean compile package
 
 [working-directory: 'fictionStoryAgent']
 build: package
@@ -49,6 +53,11 @@ update-job: build
     gcloud run jobs update {{jobName}} \
       --region $GCP_LOCATION \
       --image $GCP_LOCATION-docker.pkg.dev/$GCP_PROJECT_ID/{{repoName}}/{{imgName}}:latest
+
+execute-job:
+    gcloud run jobs execute {{jobName}} \
+    --wait \
+    --region $GCP_LOCATION
 
 create-scheduler:
     gcloud scheduler jobs create http short-genai-stories-generator-schedule \

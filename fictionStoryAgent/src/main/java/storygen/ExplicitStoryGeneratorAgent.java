@@ -48,7 +48,7 @@ public class ExplicitStoryGeneratorAgent {
 //    private static final String CHAT_MODEL_NAME = "gemini-2.0-flash-exp";
 //    private static final String CHAT_MODEL_NAME = "gemini-1.5-flash-002";
     private static final String CHAT_MODEL_NAME = "gemini-1.5-pro-002";
-    private static final String IMAGE_MODEL_NAME = "imagen-3.0-generate-001";
+    private static final String IMAGE_MODEL_NAME = "imagen-3.0-generate-002";
 
     private static final String GCP_PROJECT_ID = System.getenv("GCP_PROJECT_ID");
     private static final String GCP_LOCATION = System.getenv("GCP_LOCATION");
@@ -330,8 +330,7 @@ public class ExplicitStoryGeneratorAgent {
         );
 
         String responseText = response.content().text();
-        Story generatedStory = GSON.fromJson(responseText, Story.class);
-        return generatedStory;
+        return GSON.fromJson(responseText, Story.class);
     }
 
     private static String prepareImagePromptForChapter(Story.Chapter chapter) {
