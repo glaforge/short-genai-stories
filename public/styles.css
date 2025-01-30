@@ -187,3 +187,12 @@ details[open] > summary::after {
     width: 1em;
 }
 
+#footer, #footer a {
+    color: white;
+}
+
+#footer hr {
+    margin-top: 2em;
+    max-width: 48em;
+    border: 2px solid var(--chapter-background);
+}
