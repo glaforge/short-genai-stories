@@ -4,6 +4,7 @@
     --box-shadow: #082836;
     --border-color: black;
     --border-size: 2px;
+    --lighter-color: #3498db;
 }
 
 * {
@@ -45,6 +46,33 @@ h1 {
 
 #publicationDate {
     padding-bottom: 1em;
+}
+
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+}
+
+.loading-spinner {
+    border: 20px solid white;
+    border-top: 20px solid var(--lighter-color);
+    border-radius: 50%;
+    width: 100px;
+    height: 100px;
+    animation: spin 1s ease-in-out infinite alternate;
+    margin-bottom: 0.5em;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.chapters:not(:empty) > .loading-container {
+    display: none;
 }
 
 summary {

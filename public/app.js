@@ -16,6 +16,9 @@
 
 document.addEventListener('DOMContentLoaded', function () {
         try {
+            const spinner = document.querySelector('.loading-container');
+            spinner.style.display = 'flex';
+
             let app = firebase.app();
             const db = firebase.firestore(app);
 
@@ -38,6 +41,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (querySnapshot.empty) {
                             window.location.href = '/';
                         }
+
+                        spinner.style.display = 'none';
 
                         querySnapshot.forEach((doc) => {
                             const title = doc.data().title;
